@@ -1,0 +1,17 @@
+{
+  "title": "Economic and Market Monitoring Report",
+  "sources": [
+    {
+      "name": "rates",
+      "type": "file",
+      "format": "csv",
+      "path": "data/rates.csv"
+    },
+    {
+      "name": "markets",
+      "type": "file",
+      "format": "json",
+      "path": "data/markets.json"
+    }
+  ]
+}
