@@ -1,0 +1,4 @@
+[
+  {"period": "2025-Q1", "indicator": "USD Index", "value": 104.2, "unit": "index"},
+  {"period": "2025-Q1", "indicator": "Brent", "value": 82.4, "unit": "USD/bbl"}
+]
