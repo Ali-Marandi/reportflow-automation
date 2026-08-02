@@ -1,0 +1,33 @@
+name: Production Release
+
+on:
+  push:
+    tags:
+      - 'v*' # اجرا فقط هنگام ثبت تگ جدید مانند v1.0.1
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install build tools
+        run: pip install build
+        
+      - name: Build package artifacts
+        run: python -m build
+        
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
+          body_path: CHANGELOG.md # در صورت وجود
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
