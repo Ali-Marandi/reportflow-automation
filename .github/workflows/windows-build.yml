@@ -1,34 +1,143 @@
-name: Windows Executable Build
+name: Windows Build & Package
 
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      skip_tests:
+        description: "Skip test suite before building"
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+
+permissions:
+  contents: write
 
 jobs:
   build-windows:
+    name: Build ReportFlow.exe
     runs-on: windows-latest
+
     steps:
-      - uses: actions/checkout@v4
-      
-      - name: Set up Python
+      # ── Checkout ──────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Python ────────────────────────────────────────────────────────────
+      - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
-          
+          python-version: "3.11"
+          cache: "pip"
+
+      # ── Dependencies ──────────────────────────────────────────────────────
+      - name: Install project and build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          pip install "pyinstaller>=6.0" pytest
+
+      # ── Tests ─────────────────────────────────────────────────────────────
+      - name: Run test suite
+        if: ${{ github.event.inputs.skip_tests != 'true' }}
+        run: python -m pytest tests/ -v --tb=short
+
+      # ── Build (using spec file for reproducible, template-aware build) ────
+      - name: Build single-file executable
+        run: |
+          pyinstaller reportflow.spec --clean --noconfirm
+
+      # ── Verify ────────────────────────────────────────────────────────────
+      - name: Verify executable and print info
+        shell: pwsh
+        run: |
+          $exe = "dist\ReportFlow.exe"
+          if (-not (Test-Path $exe)) {
+            Write-Error "Executable not found: $exe"
+            exit 1
+          }
+          $size = (Get-Item $exe).Length / 1MB
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash
+          Write-Host "File   : $exe"
+          Write-Host "Size   : $([math]::Round($size, 2)) MB"
+          Write-Host "SHA256 : $hash"
+
+      # ── Smoke test ────────────────────────────────────────────────────────
+      - name: Smoke-test executable (--help)
+        run: dist\ReportFlow.exe --help
+
+      # ── Upload artifact ───────────────────────────────────────────────────
+      - name: Upload executable as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ReportFlow-Windows-x64
+          path: dist/ReportFlow.exe
+          retention-days: 30
+
+      # ── Attach to GitHub Release (tag builds only) ────────────────────────
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/ReportFlow.exe
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ── Optional: MSI installer ───────────────────────────────────────────────
+  build-msi:
+    name: Build MSI Installer (WiX)
+    runs-on: windows-latest
+    needs: build-windows
+    if: startsWith(github.ref, 'refs/tags/')
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install .
-          pip install pyinstaller
-          
-      - name: Build EXE with PyInstaller
-        run: |
-          pyinstaller --onefile --name ReportFlow --clean src/reportflow/cli.py
-          
-      - name: Upload Windows Executable to Release
-        uses: softprops/action-gh-release@v1
+          pip install -e .
+          pip install "pyinstaller>=6.0"
+
+      - name: Download executable artifact
+        uses: actions/download-artifact@v4
         with:
-          files: dist/ReportFlow.exe
+          name: ReportFlow-Windows-x64
+          path: dist
+
+      - name: Install WiX Toolset
+        run: choco install wixtoolset -y
+
+      - name: Generate WiX source and build MSI
+        shell: pwsh
+        run: |
+          python tools/create_msi_installer.py dist\ReportFlow.exe
+          $wxs = "reportflow.wxs"
+          if (Test-Path $wxs) {
+            & "C:\Program Files (x86)\WiX Toolset v3.11\bin\candle.exe" $wxs
+            & "C:\Program Files (x86)\WiX Toolset v3.11\bin\light.exe" -ext WixUIExtension reportflow.wixobj -o dist\ReportFlowInstaller.msi
+          }
+
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ReportFlow-Windows-Installer
+          path: dist/ReportFlowInstaller.msi
+          retention-days: 30
+
+      - name: Attach MSI to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/ReportFlowInstaller.msi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

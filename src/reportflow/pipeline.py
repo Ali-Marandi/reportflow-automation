@@ -4,9 +4,9 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 import pandas as pd
-from jinja2 import Environment, FileSystemLoader
 from .models import ReportConfig, Snapshot
 from .sources import load_source
+from .branding import BrandingConfig, build_template_context, get_jinja_env
 
 logger = logging.getLogger(__name__)
 
@@ -77,22 +77,28 @@ def run_pipeline(config_path: str | Path, output_dir: str | Path) -> dict[str, s
     # Export HTML
     if "html" in config.output_formats:
         html_path = output_path / "report.html"
-        env = Environment(loader=FileSystemLoader(Path(__file__).parent / "templates"))
-        template = env.get_template("report.html")
-        
+
+        # Build branding config (merge user overrides with defaults)
+        brand_data = config.branding or {}
+        brand = BrandingConfig(**brand_data)
+        jinja_env, template_name = get_jinja_env(brand)
+        template = jinja_env.get_template(template_name)
+
         table_html = combined_df.to_html(
-            classes="table table-striped table-hover", 
+            classes="table table-striped table-hover",
             index=False,
-            border=0
+            border=0,
         )
-        
-        html_content = template.render(
-            title=config.title,
-            snapshots=snapshots,
-            records=combined_df.to_dict(orient="records"),
-            table_html=table_html,
-            generated_at=datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')
-        )
+
+        base_ctx = {
+            "title": config.title,
+            "snapshots": snapshots,
+            "records": combined_df.to_dict(orient="records"),
+            "table_html": table_html,
+            "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC"),
+        }
+        ctx = build_template_context(base_ctx, brand)
+        html_content = template.render(**ctx)
         html_path.write_text(html_content, encoding="utf-8")
         results["html"] = str(html_path)
         

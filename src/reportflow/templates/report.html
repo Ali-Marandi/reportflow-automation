@@ -3,61 +3,158 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ title }}</title>
+    <title>{{ title }} — {{ brand.company_name }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        body { background-color: #f8f9fa; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .report-header { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); color: white; padding: 3rem 0; margin-bottom: 2rem; }
-        .card { border-radius: 12px; border: none; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); margin-bottom: 2rem; }
+        /* ── Brand CSS custom properties ─────────────────────────────── */
+        {{ css_vars | safe }}
+
+        /* ── Base ────────────────────────────────────────────────────── */
+        body {
+            background-color: var(--rf-bg);
+            font-family: var(--rf-font);
+            color: var(--rf-text);
+        }
+        h1, h2, h3, h4, h5, h6 {
+            font-family: var(--rf-heading-font);
+        }
+
+        /* ── Header ──────────────────────────────────────────────────── */
+        .report-header {
+            background: linear-gradient(135deg, var(--rf-primary) 0%, var(--rf-secondary) 100%);
+            color: white;
+            padding: 3rem 0;
+            margin-bottom: 2rem;
+        }
+        .report-header .company-logo {
+            max-height: 56px;
+            margin-bottom: 1rem;
+            filter: brightness(0) invert(1);   /* make logo white on dark bg */
+        }
+        .report-header .badge-accent {
+            background-color: var(--rf-accent) !important;
+            color: #fff;
+        }
+
+        /* ── Cards ───────────────────────────────────────────────────── */
+        .card {
+            border-radius: 12px;
+            border: 1px solid var(--rf-card-border);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,.08);
+            margin-bottom: 2rem;
+        }
+        .card-title {
+            color: var(--rf-primary);
+        }
+
+        /* ── Table ───────────────────────────────────────────────────── */
         .table-container { overflow-x: auto; }
-        .provenance-item { border-left: 4px solid #3b82f6; padding-left: 1rem; margin-bottom: 1rem; }
-        .sha256 { font-family: monospace; font-size: 0.85rem; color: #6b7280; }
-        .footer { padding: 2rem 0; color: #6b7280; font-size: 0.9rem; }
+        .table thead th {
+            background-color: var(--rf-primary);
+            color: #fff;
+            border-color: var(--rf-primary);
+        }
+        .table-striped > tbody > tr:nth-of-type(odd) > * {
+            background-color: color-mix(in srgb, var(--rf-primary) 5%, white);
+        }
+
+        /* ── Provenance ──────────────────────────────────────────────── */
+        .provenance-item {
+            border-left: 4px solid var(--rf-accent);
+            padding-left: 1rem;
+            margin-bottom: 1rem;
+        }
+        .sha256 {
+            font-family: monospace;
+            font-size: 0.82rem;
+            color: #6b7280;
+            word-break: break-all;
+        }
+
+        /* ── Footer ──────────────────────────────────────────────────── */
+        .report-footer {
+            padding: 2rem 0;
+            color: #6b7280;
+            font-size: 0.88rem;
+            border-top: 1px solid var(--rf-card-border);
+            margin-top: 1rem;
+        }
+        .powered-by {
+            font-size: 0.78rem;
+            opacity: .6;
+        }
     </style>
 </head>
 <body>
+
+    <!-- ═══════════════════════════ HEADER ═══════════════════════════ -->
     <header class="report-header">
         <div class="container text-center">
+            {% if brand.logo_url %}
+            <img src="{{ brand.logo_url }}" alt="{{ brand.logo_alt }}" class="company-logo d-block mx-auto">
+            {% endif %}
             <h1 class="display-4 fw-bold">{{ title }}</h1>
-            <p class="lead">Automated Financial Intelligence Report</p>
-            <div class="mt-3">
-                <span class="badge bg-light text-primary px-3 py-2">{{ snapshots|length }} Sources</span>
-                <span class="badge bg-light text-primary px-3 py-2 ms-2">{{ records|length }} Records</span>
-                <span class="badge bg-light text-primary px-3 py-2 ms-2">Generated: {{ generated_at }}</span>
+            <p class="lead opacity-90">{{ brand.tagline }}</p>
+            <div class="mt-3 d-flex flex-wrap justify-content-center gap-2">
+                <span class="badge badge-accent px-3 py-2">
+                    <i class="me-1">&#128202;</i> {{ snapshots|length }} Source{{ 's' if snapshots|length != 1 }}
+                </span>
+                <span class="badge badge-accent px-3 py-2">
+                    <i class="me-1">&#128196;</i> {{ records|length }} Record{{ 's' if records|length != 1 }}
+                </span>
+                <span class="badge bg-light text-dark px-3 py-2">
+                    &#128336; {{ generated_at }}
+                </span>
+                {% if brand.company_name != "ReportFlow" %}
+                <span class="badge bg-white text-dark px-3 py-2">
+                    &#127970; {{ brand.company_name }}
+                </span>
+                {% endif %}
             </div>
         </div>
     </header>
 
+    <!-- ═══════════════════════════ MAIN ════════════════════════════ -->
     <main class="container">
+
+        <!-- Data table -->
         <div class="card">
             <div class="card-body">
-                <h2 class="card-title h4 mb-4">Normalized Financial Data</h2>
+                <h2 class="card-title h4 mb-4">&#128200; Normalised Financial Data</h2>
                 <div class="table-container">
                     {{ table_html | safe }}
                 </div>
             </div>
         </div>
 
+        <!-- Provenance -->
         <div class="card">
             <div class="card-body">
-                <h2 class="card-title h4 mb-4">Data Provenance & Integrity</h2>
+                <h2 class="card-title h4 mb-4">&#128273; Data Provenance &amp; Integrity</h2>
                 {% for s in snapshots %}
                 <div class="provenance-item">
-                    <div class="d-flex justify-content-between align-items-center">
+                    <div class="d-flex justify-content-between align-items-start flex-wrap gap-1">
                         <h3 class="h6 mb-1 fw-bold">{{ s.name }}</h3>
                         <span class="text-muted small">{{ s.retrieved_at.strftime('%Y-%m-%d %H:%M:%S UTC') }}</span>
                     </div>
-                    <p class="mb-1 text-truncate small text-muted">{{ s.source }}</p>
-                    <div class="sha256">SHA256: {{ s.sha256 }}</div>
+                    <p class="mb-1 small text-muted text-truncate">{{ s.source }}</p>
+                    {% if brand.show_sha256 %}
+                    <div class="sha256">SHA-256: {{ s.sha256 }}</div>
+                    {% endif %}
                 </div>
                 {% endfor %}
             </div>
         </div>
+
     </main>
 
-    <footer class="footer container text-center">
-        <hr>
-        <p>&copy; 2026 ReportFlow Automation. All rights reserved.</p>
+    <!-- ═══════════════════════════ FOOTER ══════════════════════════ -->
+    <footer class="report-footer container text-center">
+        <p class="mb-1">{{ brand.footer_text }}</p>
+        {% if brand.show_powered_by %}
+        <p class="powered-by mb-0">Powered by <strong>ReportFlow Automation</strong></p>
+        {% endif %}
     </footer>
+
 </body>
 </html>
