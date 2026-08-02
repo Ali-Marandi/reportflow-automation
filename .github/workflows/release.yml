@@ -3,11 +3,14 @@ name: Production Release
 on:
   push:
     tags:
-      - 'v*' # اجرا فقط هنگام ثبت تگ جدید مانند v1.0.1
+      - 'v*'
 
 jobs:
   release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
     steps:
       - uses: actions/checkout@v4
       
@@ -28,6 +31,22 @@ jobs:
           files: |
             dist/*.whl
             dist/*.tar.gz
-          body_path: CHANGELOG.md # در صورت وجود
+          body_path: CHANGELOG.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/reportflow:latest
+            ghcr.io/${{ github.repository_owner }}/reportflow:${{ github.ref_name }}
